@@ -339,6 +339,9 @@ class ShareGPTPromptTokenizingStrategy(PromptTokenizingStrategy):
         conversation: Conversation = (
             self.prompter._conversation.copy()  # pylint: disable=protected-access
         )
+        
+        conversation_thread = self.get_conversation_thread(prompt)
+        num_parts = len(conversation_thread)
 
         input_roles = {conversation.roles[0]}
         output_roles = {conversation.roles[1]}
@@ -370,7 +373,7 @@ class ShareGPTPromptTokenizingStrategy(PromptTokenizingStrategy):
             ]
 
         try:
-            for _, part in enumerate(
+            for i, part in enumerate(
                 self.prompter.build_prompt(self.get_conversation_thread(prompt))
             ):
                 if not isinstance(part, tuple):
@@ -391,6 +394,10 @@ class ShareGPTPromptTokenizingStrategy(PromptTokenizingStrategy):
                 if not any([input_turn, output_turn, empty_role]):
                     LOG.warning(f"unhandled role: {role}")
                     continue
+
+                is_last_part = i == num_parts - 1
+
+                # LOG.warning("part i", i)
 
                 if input_turn:
                     role = (
@@ -426,6 +433,11 @@ class ShareGPTPromptTokenizingStrategy(PromptTokenizingStrategy):
                         conversation.name == "chatml"
                         and conversation.sep == self.tokenizer.eos_token
                     )
+
+                    add_eos_token = False
+                    if is_last_part:
+                        add_eos_token=True
+                    
                     res = self._tokenize(
                         turn,
                         add_eos_token=add_eos_token,
@@ -436,6 +448,11 @@ class ShareGPTPromptTokenizingStrategy(PromptTokenizingStrategy):
                         add_eos_token=False,
                         strip_bos_token=True,
                     )
+
+                    # if is_last_part:
+                    # LOG.warning("res", res)
+                    # LOG.warning("Role res", role_res)
+                    
                     labels = copy.deepcopy(res["input_ids"])
                     if not self.train_on_inputs:
                         # mask out role tokens from the labels
